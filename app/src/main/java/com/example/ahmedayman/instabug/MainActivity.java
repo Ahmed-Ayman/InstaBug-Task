@@ -46,36 +46,40 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
     private static final String TAG_URL = "html_url";
     private static final String TAG_DESCREPTION = "description";
     private static final String TAG_FORK = "fork";
-    boolean flag_loading;
+    boolean flag_loading = false;
     private int itemsNum = 10, pages = 1;
     int count = 0, length = -1;
-    int here = 0 ;
+    int here = 0;
     private SwipeRefreshLayout swipeRefreshLayout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        flag_loading = false;
+
+
         swipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
         swipeRefreshLayout.setOnRefreshListener(this);
-
         noConnection = (TextView) findViewById(R.id.no_connection);
         reached = (TextView) findViewById(R.id.reached);
+        listView = (ListView) findViewById(R.id.list_view);
+
+
         repoModelList = new ArrayList<>();
         db = new DataBaseHandler(this);
+
         //display the data on the list view
         adapter = new CustomAdabter(MainActivity.this, repoModelList);
-        listView = (ListView) findViewById(R.id.list_view);
         listView.setAdapter(adapter);
         listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
 
             //On long click listener
             @Override
             public boolean onItemLongClick(AdapterView<?> parent, View view, final int position, long id) {
+
                 //  creating Dialoge
                 AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-                String[] dialogeItems = {"Go to the main repository", "Go to the owner repository"};
+                String[] dialogeItems = {"the main repository", "the owner repository"};
                 builder.setItems(dialogeItems, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {
                         if (which == 0) {
@@ -108,7 +112,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
                     if (length == 0)
                         reached.setVisibility(View.VISIBLE);
                     else
-                    reached.setVisibility(View.GONE);
+                        reached.setVisibility(View.GONE);
 
                     if (flag_loading == false && length != 0) {
                         flag_loading = true;
@@ -121,10 +125,10 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
         addItems(1, pages);
     }
 
-
+    // add Items to the List View
     private void addItems(int page, int itemsNum) {
-    if (count != 0 )
-        swipeRefreshLayout.setRefreshing(true);
+        if (count != 0)
+            swipeRefreshLayout.setRefreshing(true);
 
         new FetchTheRepo().execute(url.concat("?per_page=" + itemsNum + "&page=" + pages) + accessToken);
         flag_loading = false;
@@ -132,12 +136,11 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
 
     @Override
     public void onRefresh() {
-
         addItems(pages++, itemsNum);
     }
 
     /**
-     * Async Task
+     * Async Task to fetch the Json and to display it on the List View by Notifying the Adabter
      */
     public class FetchTheRepo extends AsyncTask<String, Void, String> {
 
@@ -155,7 +158,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
 
         @Override
         protected String doInBackground(String... params) {
-     if (params.length == 0) {
+            if (params.length == 0) {
                 return null;
             }
             HttpURLConnection urlConnection = null;
@@ -170,9 +173,11 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
                 urlConnection.connect();
 
                 InputStream stream = urlConnection.getInputStream();
+
                 if (stream == null) {
                     return null;
                 }
+
                 StringBuffer json = new StringBuffer();
                 bufferedReader = new BufferedReader(new InputStreamReader(stream));
                 String line;
@@ -182,13 +187,14 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
                 if (json.length() == 0)
                     return null;
                 JsonResponse = json.toString();
+                //Parse
                 try {
                     parse(JsonResponse);
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
             } catch (IOException e) {
-
+                e.printStackTrace();
             } finally {
                 if (urlConnection != null) {
                     urlConnection.disconnect();
@@ -203,30 +209,26 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             }//finally check if not null to close
             return JsonResponse;
         }
+
         @Override
         protected void onPostExecute(String s) {
-
             swipeRefreshLayout.setRefreshing(false);
             if (progressDialog.isShowing())
                 progressDialog.dismiss();
             // Question to Ask !! is there any other way to display this noConnection TextViw ?!
-            if (s == null ) {
-
-                     List<RepoModel> data = db.getAllRepos();
-                        if (data == null)
-                            noConnection.setVisibility(View.VISIBLE);
-else {
-                            for (int i = here; i < data.size(); i++) {
-                                repoModelList.add(data.get(i));
-                                here++;
-                            }
-                        }
-
-                if (repoModelList!=null)
+            if (s == null) {
+                if (repoModelList.size() == 0)
+                noConnection.setVisibility(View.VISIBLE);
+                List<RepoModel> data = db.getAllRepos();
+                for (int i = here; i < data.size(); i++) {
+                    repoModelList.add(data.get(i));
+                    here++;
+                }
+                if (repoModelList.size()!=0) {
                     adapter.notifyDataSetChanged();
-
-            }
-            else
+                    noConnection.setVisibility(View.GONE);
+                }
+            } else
                 adapter.notifyDataSetChanged();
         }
 
@@ -252,6 +254,5 @@ else {
                 db.addRepo(model);
             }
         }
-
     }
 }

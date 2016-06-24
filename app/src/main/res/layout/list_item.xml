@@ -8,34 +8,42 @@
     android:orientation="vertical"
     android:padding="@dimen/activity_horizontal_margin">
 
-
-    <TextView
-        android:paddingBottom="5dp"
-        android:id="@+id/repo_name"
+    <LinearLayout
+        android:paddingBottom="@dimen/activity_horizontal_margin"
+        android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="@android:color/black"
-        android:textSize="@dimen/size"
-android:text="@string/user_name"
-        android:textStyle="bold" />
+        android:background="@android:color/black">
+
+        <TextView
+            android:id="@+id/repo_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="5dp"
+            android:text="@string/user_name"
+            android:textColor="#ffffff"
+            android:gravity="center_horizontal"
+            android:padding="5dp"
+            android:textSize="@dimen/size"
+            android:textStyle="bold" />
+        <TextView
+            android:textColor="#22ff00"
+            android:gravity="center_horizontal"
+            android:id="@+id/user_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="@dimen/activity_horizontal_margin"
+            android:background="@android:color/black"
+            android:text="@string/user_name"
+            android:textSize="@dimen/user_name" />
+    </LinearLayout>
 
     <TextView
-        android:id="@+id/user_name"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginLeft="@dimen/activity_horizontal_margin"
-        android:textColor="@android:color/black"
-        android:textSize="@dimen/user_name"
-android:text="@string/user_name"
-        />
-
-    <TextView
-android:text="@string/description"
         android:id="@+id/description"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="@dimen/activity_vertical_margin"
+        android:text="@string/description"
         android:textColor="@android:color/black"
-        android:textSize="@dimen/descibtion"
-        />
+        android:textSize="@dimen/descibtion" />
 </LinearLayout>
