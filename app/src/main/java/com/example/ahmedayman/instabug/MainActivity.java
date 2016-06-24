@@ -6,13 +6,11 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
 import android.view.View;
+import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -30,130 +28,172 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
-
+public class MainActivity extends AppCompatActivity implements SwipeRefreshLayout.OnRefreshListener {
     //init
     ListView listView;
-    CustomAdabter adapter ;
-    List<String> repoNames = new ArrayList<>();
-    List<String> descriptions = new ArrayList<>();
-    List<String> userNames = new ArrayList<>();
-    List<String> urls = new ArrayList<>();
-    List<String> ownerUrls = new ArrayList<>();
-    List<Boolean> fork = new ArrayList<>();
-    TextView noConnection ; //Text view to display when there's no connection.
+    CustomAdabter adapter;
+    List<RepoModel> repoModelList;
+    TextView noConnection; //Text view to be displayed when there's no connection.
+    DataBaseHandler db;
+    TextView reached;
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.menu1, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        return super.onOptionsItemSelected(item);
-
-    }
+    private static final String url = "https://api.github.com/users/square/repos";
+    private static final String accessToken = "&access_token=81be0f2d7d8741d6b15e46c394a81a538b4e053f";
+    private static final String TAG_REPONAME = "name";
+    private static final String TAG_USERNAME = "full_name";
+    private static final String TAG_OWNER = "owner";
+    private static final String TAG_OWNERURL = "html_url";
+    private static final String TAG_URL = "html_url";
+    private static final String TAG_DESCREPTION = "description";
+    private static final String TAG_FORK = "fork";
+    boolean flag_loading;
+    private int itemsNum = 10, pages = 1;
+    int count = 0, length = -1;
+    int here = 0 ;
+    private SwipeRefreshLayout swipeRefreshLayout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        noConnection= (TextView) findViewById(R.id.no_connection);
-        //execute the AsyncTask
-        new FetchTheRepo().execute("https://api.github.com/users/square/repos");
-    //display the data on the list view
-        adapter = new CustomAdabter(MainActivity.this,repoNames,descriptions,userNames,fork);
-        listView=(ListView) findViewById(R.id.list_view);
+        flag_loading = false;
+        swipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
+        swipeRefreshLayout.setOnRefreshListener(this);
+
+        noConnection = (TextView) findViewById(R.id.no_connection);
+        reached = (TextView) findViewById(R.id.reached);
+        repoModelList = new ArrayList<>();
+        db = new DataBaseHandler(this);
+        //display the data on the list view
+        adapter = new CustomAdabter(MainActivity.this, repoModelList);
+        listView = (ListView) findViewById(R.id.list_view);
         listView.setAdapter(adapter);
         listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
 
-     //On long click listener
-        @Override
-        public boolean onItemLongClick(AdapterView<?> parent, View view, final int position, long id) {
-     //  creating Dialoge
-            AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-            String [] dialogeItems = {"Go to the main repository","Go to the owner repository"};
-            builder.setItems(dialogeItems, new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int which) {
-                            if (which == 0) {
-                                String link = urls.get(position);
-                                Intent intent = new Intent(Intent.ACTION_VIEW);
-                                intent.setData(Uri.parse(link));
-                                startActivity(intent);
-                            }
-                            else{
-                                String link = ownerUrls.get(position);
-                                Intent intent = new Intent(Intent.ACTION_VIEW);
-                                intent.setData(Uri.parse(link));
-                                startActivity(intent);
-                            }
+            //On long click listener
+            @Override
+            public boolean onItemLongClick(AdapterView<?> parent, View view, final int position, long id) {
+                //  creating Dialoge
+                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                String[] dialogeItems = {"Go to the main repository", "Go to the owner repository"};
+                builder.setItems(dialogeItems, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (which == 0) {
+                            String link = repoModelList.get(position).getUrl();
+                            Intent intent = new Intent(Intent.ACTION_VIEW);
+                            intent.setData(Uri.parse(link));
+                            startActivity(intent);
+                        } else {
+                            String link = repoModelList.get(position).getOwnerUrl();
+                            Intent intent = new Intent(Intent.ACTION_VIEW);
+                            intent.setData(Uri.parse(link));
+                            startActivity(intent);
                         }
-                    });
+                    }
+                });
+                builder.create().show();
+                return false;
+            }
+        });
 
-            builder.create().show();
-            return false;
-        }
-    });
+        listView.setOnScrollListener(new AbsListView.OnScrollListener() {
+            public void onScrollStateChanged(AbsListView view, int scrollState) {
+            }
+
+            public void onScroll(AbsListView view, int firstVisibleItem,
+                                 int visibleItemCount, int totalItemCount) {
+
+                if (firstVisibleItem + visibleItemCount == totalItemCount && totalItemCount != 0) {
+
+                    if (length == 0)
+                        reached.setVisibility(View.VISIBLE);
+                    else
+                    reached.setVisibility(View.GONE);
+
+                    if (flag_loading == false && length != 0) {
+                        flag_loading = true;
+                        count++;
+                        addItems(pages++, itemsNum);
+                    }
+                }
+            }
+        });
+        addItems(1, pages);
+    }
+
+
+    private void addItems(int page, int itemsNum) {
+    if (count != 0 )
+        swipeRefreshLayout.setRefreshing(true);
+
+        new FetchTheRepo().execute(url.concat("?per_page=" + itemsNum + "&page=" + pages) + accessToken);
+        flag_loading = false;
+    }
+
+    @Override
+    public void onRefresh() {
+
+        addItems(pages++, itemsNum);
     }
 
     /**
-     * Asynk Task to fetch the Json for the API
+     * Async Task
      */
-    public class FetchTheRepo extends AsyncTask<String , Void ,String > {
+    public class FetchTheRepo extends AsyncTask<String, Void, String> {
 
-        ProgressDialog progressDialog;
+        ProgressDialog progressDialog = new ProgressDialog(MainActivity.this);
+
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-           progressDialog = ProgressDialog.show(MainActivity.this, "Loading",
-                    "Loading the Repo's......", true);
+
+            if (count == 0) {
+                progressDialog = ProgressDialog.show(MainActivity.this, "Loading",
+                        "Loading the Repo's......", true);
+            }
         }
+
         @Override
         protected String doInBackground(String... params) {
-            if (params.length == 0) {
+     if (params.length == 0) {
                 return null;
             }
             HttpURLConnection urlConnection = null;
             BufferedReader bufferedReader = null;
             String JsonResponse = null;
-
             try {
                 String link = params[0];
                 URL url = new URL(link);
+
                 urlConnection = (HttpURLConnection) url.openConnection();
                 urlConnection.setRequestMethod("GET");
                 urlConnection.connect();
-                InputStream stream = urlConnection.getInputStream();
-                StringBuffer json = new StringBuffer();
 
+                InputStream stream = urlConnection.getInputStream();
                 if (stream == null) {
                     return null;
                 }
+                StringBuffer json = new StringBuffer();
                 bufferedReader = new BufferedReader(new InputStreamReader(stream));
-
-                String line ;
-                while ((line = bufferedReader.readLine()) !=null)
-                {
-                    json.append(line+"\n");
+                String line;
+                while ((line = bufferedReader.readLine()) != null) {
+                    json.append(line + "\n");
                 }
                 if (json.length() == 0)
-                    return null ;
-
-                JsonResponse = json.toString() ;
-
-                Log.e("json",JsonResponse);
-            } catch (IOException e) {
-                progressDialog.dismiss();
+                    return null;
+                JsonResponse = json.toString();
+                try {
+                    parse(JsonResponse);
+                } catch (JSONException e) {
+                    e.printStackTrace();
                 }
-            finally {
-                if (urlConnection!= null)
-                {
+            } catch (IOException e) {
+
+            } finally {
+                if (urlConnection != null) {
                     urlConnection.disconnect();
                 }
-                if(bufferedReader!= null)
-                {
+                if (bufferedReader != null) {
                     try {
                         bufferedReader.close();
                     } catch (IOException e) {
@@ -161,65 +201,57 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             }//finally check if not null to close
-
-            return  JsonResponse ;
+            return JsonResponse;
         }
-
         @Override
         protected void onPostExecute(String s) {
-            super.onPostExecute(s);
-            if (s==null)
-            {
-                noConnection.setText(R.string.connection);
+
+            swipeRefreshLayout.setRefreshing(false);
+            if (progressDialog.isShowing())
+                progressDialog.dismiss();
+            // Question to Ask !! is there any other way to display this noConnection TextViw ?!
+            if (s == null ) {
+
+                     List<RepoModel> data = db.getAllRepos();
+                        if (data == null)
+                            noConnection.setVisibility(View.VISIBLE);
+else {
+                            for (int i = here; i < data.size(); i++) {
+                                repoModelList.add(data.get(i));
+                                here++;
+                            }
+                        }
+
+                if (repoModelList!=null)
+                    adapter.notifyDataSetChanged();
+
             }
-            else {
-           progressDialog.dismiss();
-                try {
-                    getMyData(s);
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
+            else
                 adapter.notifyDataSetChanged();
-            }
         }
 
         /**
-         *
-          * @param s  Json Response
-         * @throws JSONException
-         * this method will fill the arrays with the needed data.
+         * @param s Json Response
+         * @throws JSONException this method will fill the arrays with the needed data.
          */
-        private void getMyData(String s ) throws JSONException {
-            JSONArray arrayOfData  = new JSONArray(s);
-
-        for (int i =  0 ; i < 10;i++)
-        {
-            // Parsing the Json
-            JSONObject item = arrayOfData.getJSONObject(i);
-            String name = item.getString("name");
-            String userName = item.getString("full_name");
-            JSONObject owner = item.getJSONObject("owner");
-            String ownerUrl = owner.getString("html_url");
-            String htmlUrl = item.getString("html_url");
-            String description = item.getString("description");
-
-            //filling the Array lists with the data
-            repoNames.add(name);
-            descriptions.add(description);
-            userNames.add(userName);
-            urls.add(htmlUrl);
-            ownerUrls.add(ownerUrl);
-
-            //checking the Fork status
-            String forkStatus =item.getString("fork");
-
-            if(forkStatus.equals("false")) {
-                fork.add(false);
+        private void parse(String s) throws JSONException {
+            JSONArray arrayOfData = new JSONArray(s);
+            length = arrayOfData.length();
+            for (int i = 0; i < arrayOfData.length(); i++) {
+                RepoModel model = new RepoModel();
+                // Parsing the Json
+                JSONObject item = arrayOfData.getJSONObject(i);
+                JSONObject owner = item.getJSONObject(TAG_OWNER);
+                model.setDescription(item.getString(TAG_DESCREPTION));
+                model.setFork(item.getString(TAG_FORK));
+                model.setUsername(item.getString(TAG_USERNAME));
+                model.setRepoName(item.getString(TAG_REPONAME));
+                model.setUrl(item.getString(TAG_URL));
+                model.setOwnerUrl(owner.getString(TAG_OWNERURL));
+                repoModelList.add(model);
+                db.addRepo(model);
             }
-            else
-                fork.add(true);
         }
-        }
-    }
 
     }
+}

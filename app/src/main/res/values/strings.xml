@@ -1,9 +1,10 @@
 <resources>
-    <string name="app_name">InstaBug</string>
+    <string name="app_name">InstaBug Task</string>
     <string name="refresh">refresh</string>
     <string name="go_to_repo"></string>
     <string name="description">Description</string>
     <string name="repo_name">Repository Name</string>
     <string name="user_name">User Name</string>
+    <string name="reached_the_bottom">Reached the last Repo</string>
 <string name="connection">Kindly check your Internet Connection</string>
 </resources>

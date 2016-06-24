@@ -3,4 +3,6 @@
     <dimen name="activity_horizontal_margin">16dp</dimen>
     <dimen name="activity_vertical_margin">16dp</dimen>
     <dimen name="size">16dp</dimen>
+    <dimen name="user_name">10dp</dimen>
+    <dimen name="descibtion">12dp</dimen>
 </resources>
